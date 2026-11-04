@@ -1,31 +1,5 @@
 r"""
-Periodic graphs.
-
-A periodic graph is encoded by its quotient graph: a finite :class:`DiGraph`
-whose vertices are the fundamental domain `D_V` and whose arcs are the edge
-representatives `D_E`, each labelled by its index `ind_H(e) \in \Gamma`.
-The group `\Gamma` is a finitely generated additive abelian group.
-
-A vertex of the (infinite) periodic graph is a pair ``(v, gamma)`` standing for
-`\gamma v` with `v \in D_V`, so `\xi((v, \gamma)) = \gamma`. The action is
-`\gamma \cdot (v, \delta) = (v, \gamma + \delta)` and an arc ``(u, v, gamma)``
-of the quotient lifts to the edges ``((u, delta), (v, delta + gamma))``.
-Bridge edges are the arcs with nonzero index.
-
-EXAMPLES:
-
-The square lattice::
-
-    sage: from periodicnet.pgraph import PGraph
-    sage: P = PGraph([(0, 0, (1, 0)), (0, 0, (0, 1))], group=[0, 0])
-    sage: P
-    Periodic graph on 1 vertex over Additive abelian group isomorphic to Z + Z
-    sage: P.periodic_neighbors(P.periodic_vertex(0, (2, 3)))
-    [(0, (2, 4)), (0, (3, 3)), (0, (2, 2)), (0, (1, 3))]
-    sage: P.lift([(0, 0), (1, 0), (0, 1), (1, 1)])
-    Graph on 4 vertices
 """
-from sage.graphs.graph import Graph
 from sage.graphs.digraph import DiGraph
 from sage.graphs.generic_graph import GenericGraph
 from sage.groups.abelian_gps.abelian_group import AbelianGroup
@@ -33,23 +7,9 @@ from sage.groups.abelian_gps.abelian_group import AbelianGroup_class
 from sage.structure.element import parent
 
 
-class PDiGraph(DiGraph):
+class PeriodicDiGraph(DiGraph):
     r"""
-    Periodic graph given by a Fundamental Domain graph with edge indices as 
-    labels.
 
-    INPUT:
-
-    - ``data`` -- anything accepted by :class:`DiGraph`; edge labels are the
-      indices (``None`` is the identity). Undirected graphs are oriented as
-      their edges are listed.
-    - ``group`` -- an additive abelian group or a list of invariants
-      (``[0, 0]`` is `\ZZ^2`); taken from ``data`` if it is a :class:`PGraph`.
-    - ``boundary`` -- a list of 3-tuples, (u, v, ind)
-
-    The other arguments are the ones of :class:`DiGraph` from SageMath, except that
-    ``loops`` and ``multiedges`` default to ``True``, since non trivial quotients
-    are going to have loops or multiedges.
     """
 
     def __init__(self, data=None, group=None, pos=None, loops=None,
@@ -59,7 +19,7 @@ class PDiGraph(DiGraph):
                  immutable=False, hash_labels=None):
 
         # Define the group acting on G
-        if group is None and isinstance(data, PGraph):
+        if group is None and isinstance(data, PeridoicDiGraph):
             group = data.group()
         self._group = group
 
@@ -131,24 +91,22 @@ class PDiGraph(DiGraph):
 
     def add_edges(self, edges, loops=True, add_sym=True):
         def with_index(e):
-            u, v, dd = e
+            u, v, *rest = e
+            dd = rest[0] if rest else None
             if not isinstance(dd, dict):
-                if dd:
-                    dd = {'label': dd}
-                else:
-                    dd = {}
+                dd = {'label': dd} if dd is not None else {}
+            else:
+                dd = dd.copy()
 
             dd['ind'] = dd.get('ind', self._index(None))
             return u, v, dd
-        
-        def inv_with_index(e):
-            u, v, *dd = e
-            if not isinstance(dd, dict):
-                dd = {'label': dd}
 
-            dd['ind'] = dd.get('ind', self._index(None))**-1
+        def inv_with_index(e):
+            u, v, dd = with_index(e)
+            dd['ind'] = dd['ind']**-1
             return v, u, dd
 
+        edges = list(edges)  # traversed twice
         DiGraph.add_edges(self, (with_index(e) for e in edges), loops=loops)
         DiGraph.add_edges(self, (inv_with_index(e) for e in edges), loops=loops)
 
